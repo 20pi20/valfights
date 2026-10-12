@@ -1,0 +1,284 @@
+---
+import Base from '../layouts/Base.astro';
+import BarList from '../components/BarList.astro';
+import Columns from '../components/Columns.astro';
+import Gloves from '../components/Gloves.astro';
+import { average, countBy, fighters, fighterUrl, fights, fightUrl, formatDate, isStoppage, resultLine } from '../lib/data';
+
+const total = fights.length;
+const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '—');
+
+const watched = fights.filter((f) => f.watchedDate);
+const titleFights = fights.filter((f) => f.titleFight).length;
+const withMethod = fights.filter((f) => f.method);
+const stoppages = withMethod.filter((f) => isStoppage(f.method));
+const rated = fights.filter((f) => f.rating != null);
+const avgRating = average(fights.map((f) => f.rating));
+
+const ratingBars = [
+  ...[3, 2, 1, 0].map((r) => ({
+    label: r === 0 ? '0 gloves' : '🥊'.repeat(r),
+    value: fights.filter((f) => f.rating === r).length,
+    href: `/?rating=${r}`,
+  })),
+  { label: 'Unrated', value: total - rated.length, href: '/?rating=none' },
+].filter((bar) => bar.value > 0 || bar.label !== 'Unrated');
+
+const byMethod = countBy(fights, (f) => f.method).map((m) => ({ ...m, href: `/?method=${encodeURIComponent(m.label)}` }));
+const byWeight = countBy(fights, (f) => f.weightClass).map((w) => ({ ...w, href: `/?weight=${encodeURIComponent(w.label)}` }));
+const topFighters = fighters.slice(0, 10).map((f) => ({ label: f.name, value: f.fights.length, href: fighterUrl(f.name) }));
+const topWinners = [...fighters]
+  .filter((f) => f.wins > 0)
+  .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name))
+  .slice(0, 10)
+  .map((f) => ({ label: f.name, value: f.wins, href: fighterUrl(f.name) }));
+
+// Fight era: every decade between the earliest and latest fight, gaps included.
+const decadeOf = (year: number) => Math.floor(year / 10) * 10;
+const fightYears = fights.map((f) => f.year).filter((y): y is number => y != null);
+const decades = [];
+if (fightYears.length) {
+  for (let d = decadeOf(Math.min(...fightYears)); d <= decadeOf(Math.max(...fightYears)); d += 10) {
+    decades.push({ label: `${d}s`, value: fightYears.filter((y) => decadeOf(y) === d).length });
+  }
+}
+
+// Viewing habit: by month, or by year once the log spans more than two years.
+const months = watched.map((f) => f.watchedDate!.slice(0, 7)).sort();
+const viewing = [];
+let viewingBy = 'month';
+if (months.length) {
+  const [y0, m0] = months[0].split('-').map(Number);
+  const [y1, m1] = months[months.length - 1].split('-').map(Number);
+  if ((y1 - y0) * 12 + (m1 - m0) < 24) {
+    for (let y = y0, m = m0; y < y1 || (y === y1 && m <= m1); m === 12 ? (y++, (m = 1)) : m++) {
+      const ym = `${y}-${String(m).padStart(2, '0')}`;
+      viewing.push({
+        label: formatDate(`${ym}-01`, { month: 'short', year: '2-digit' })!,
+        title: formatDate(`${ym}-01`, { month: 'long', year: 'numeric' })!,
+        value: months.filter((x) => x === ym).length,
+      });
+    }
+  } else {
+    viewingBy = 'year';
+    for (let y = y0; y <= y1; y++) viewing.push({ label: String(y), value: months.filter((x) => x.startsWith(`${y}-`)).length });
+  }
+}
+
+// Which round the stoppages came in.
+const stoppageRounds = stoppages.map((f) => f.round).filter((r): r is number => typeof r === 'number');
+const rounds = [];
+for (let r = 1; r <= Math.max(0, ...stoppageRounds); r++) {
+  rounds.push({ label: `R${r}`, title: `Round ${r}`, value: stoppageRounds.filter((x) => x === r).length });
+}
+
+const classics = fights.filter((f) => f.rating === 3);
+const tiles = [
+  { label: 'Bouts logged', value: total, note: `${watched.length} watched` },
+  { label: 'Fighters', value: fighters.length, note: decades.length ? `${decades[0].label} to ${decades[decades.length - 1].label}` : '' },
+  { label: 'Title fights', value: titleFights, note: `${pct(titleFights, total)} of the log` },
+  { label: 'Ended inside the distance', value: pct(stoppages.length, withMethod.length), note: `${stoppages.length} of ${withMethod.length} with a method` },
+  { label: 'Average rating', value: avgRating == null ? '—' : avgRating.toFixed(2), note: `${rated.length} rated, out of 3` },
+  { label: 'Three-glove classics', value: classics.length, note: `${pct(classics.length, rated.length)} of rated bouts` },
+];
+---
+
+<Base title="Stats" description="The numbers behind the fight log.">
+  <header class="wrap page-head">
+    <p class="kicker"><span>The numbers</span><span>{total} bouts</span></p>
+    <h1>Stats</h1>
+  </header>
+
+  {
+    total === 0 ? (
+      <div class="wrap">
+        <div class="empty">
+          <strong>Nothing to count yet</strong>
+          Add fights to the Notion database and rebuild.
+        </div>
+      </div>
+    ) : (
+      <div class="wrap">
+        <section class="tiles" aria-label="Headline numbers">
+          {tiles.map((tile) => (
+            <div class="tile">
+              <span class="label">{tile.label}</span>
+              <strong>{tile.value}</strong>
+              <span class="note">{tile.note}</span>
+            </div>
+          ))}
+        </section>
+
+        <div class="panels">
+          <section class="panel">
+            <h2 class="section-title">Ratings</h2>
+            <BarList items={ratingBars} />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">How they ended</h2>
+            <BarList items={byMethod} empty="No methods recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Weight classes</h2>
+            <BarList items={byWeight} empty="No weight classes recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Most watched <small>Top {topFighters.length}</small></h2>
+            <BarList items={topFighters} empty="No fighters recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Fight era <small>By decade</small></h2>
+            <Columns items={decades} empty="No fight dates recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Stoppage rounds</h2>
+            <Columns items={rounds} unit={['stoppage', 'stoppages']} empty="No stoppages with a round recorded." />
+          </section>
+
+          <section class="panel panel--wide">
+            <h2 class="section-title">Viewing log <small>Bouts watched per {viewingBy}</small></h2>
+            <Columns items={viewing} empty="No watched dates recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Most wins <small>In this log</small></h2>
+            <BarList items={topWinners} unit={['win', 'wins']} empty="No winners recorded." />
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">Three-glove classics <small>{classics.length}</small></h2>
+            {classics.length === 0 ? (
+              <p class="none">No three-glove bouts yet.</p>
+            ) : (
+              <ul class="classics">
+                {classics.slice(0, 12).map((fight) => (
+                  <li>
+                    <a href={fightUrl(fight)}>
+                      <strong>{fight.title}</strong>
+                      <span class="label">{[fight.year, fight.weightClass, resultLine(fight)].filter(Boolean).join(' · ')}</span>
+                    </a>
+                    <Gloves rating={fight.rating} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {classics.length > 12 && (
+              <p class="more">
+                <a class="btn" href="/?rating=3">All {classics.length} →</a>
+              </p>
+            )}
+          </section>
+        </div>
+      </div>
+    )
+  }
+</Base>
+
+<style>
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1.1rem 1.2rem 1.2rem;
+    background: var(--surface);
+    outline: 1px solid var(--line);
+  }
+
+  .tile strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.6rem, 5vw, 3.8rem);
+    line-height: 1;
+  }
+
+  .tile:first-child {
+    color: var(--on-red);
+    background: var(--red);
+    outline-color: var(--red);
+  }
+
+  .tile:first-child .label,
+  .tile:first-child .note {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .note {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(28px, 4vw, 56px) clamp(24px, 4vw, 64px);
+    margin-top: clamp(40px, 6vw, 72px);
+  }
+
+  .panel {
+    min-width: 0;
+  }
+
+  .panel--wide {
+    grid-column: 1 / -1;
+  }
+
+  .none {
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .classics {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .classics li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.6rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .classics a {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    min-width: 0;
+  }
+
+  .classics strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.3rem;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  .classics a:hover strong {
+    color: var(--red);
+  }
+
+  .more {
+    margin: 1rem 0 0;
+  }
+
+  @media (max-width: 820px) {
+    .panels {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

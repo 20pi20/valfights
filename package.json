@@ -1,0 +1,21 @@
+{
+  "name": "boxing-fight-log",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "fetch": "node --env-file-if-exists=.env scripts/fetch-notion.mjs",
+    "dev": "npm run fetch && astro dev",
+    "build": "npm run fetch && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@fontsource/anton": "^5.2.7",
+    "@fontsource/barlow": "^5.2.8",
+    "@fontsource/barlow-condensed": "^5.2.8",
+    "astro": "^7.3.8"
+  }
+}

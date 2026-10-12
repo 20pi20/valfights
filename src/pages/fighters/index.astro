@@ -1,0 +1,89 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fighters, fighterUrl } from '../../lib/data';
+---
+
+<Base title="Fighters" description="Every fighter in the log, with their record across the bouts watched.">
+  <section class="wrap page-head">
+    <p class="kicker"><span>{fighters.length} in the log</span><span>Ranked by bouts watched</span></p>
+    <h1>Fighters</h1>
+    <p class="lede">Records count only the bouts in this log, not full career records.</p>
+  </section>
+
+  <section class="wrap">
+    {
+      fighters.length === 0 ? (
+        <div class="empty">
+          <strong>No fighters yet</strong>
+          Add names to the Fighters column in Notion.
+        </div>
+      ) : (
+        <ol class="roster">
+          {fighters.map((fighter) => (
+            <li>
+              <a href={fighterUrl(fighter.name)}>
+                <span class="n">{fighter.fights.length}</span>
+                <span class="who">
+                  <strong>{fighter.name}</strong>
+                  <span class="label">
+                    {fighter.wins}–{fighter.losses}–{fighter.draws}
+                    {fighter.weightClasses[0] && ` · ${fighter.weightClasses[0]}`}
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+  </section>
+</Base>
+
+<style>
+  .roster {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+    gap: 0 clamp(16px, 2.5vw, 36px);
+  }
+
+  .roster a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-block: 0.85rem;
+    border-top: 1px solid var(--line);
+    text-decoration: none;
+  }
+
+  .n {
+    flex: none;
+    width: 2.2ch;
+    font-family: var(--display);
+    font-size: 2.6rem;
+    line-height: 1;
+    color: var(--red);
+    text-align: right;
+  }
+
+  .who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .who strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.5rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+
+  .roster a:hover strong {
+    color: var(--red);
+  }
+</style>

@@ -1,0 +1,292 @@
+---
+import Base from '../layouts/Base.astro';
+import { fights, fightUrl, formatDate, resultLine, type Fight } from '../lib/data';
+
+// Tallest a single year's stack may grow before it widens into extra columns.
+const MAX_ROWS = 10;
+const ROW = 22;
+
+const dated = fights.filter((f): f is Fight & { year: number } => f.year != null);
+const undated = fights.length - dated.length;
+const first = dated.length ? Math.min(...dated.map((f) => f.year)) : 0;
+const last = dated.length ? Math.max(...dated.map((f) => f.year)) : -1;
+
+const years = [];
+for (let year = first; year <= last; year++) {
+  const bouts = dated
+    .filter((f) => f.year === year)
+    .sort((a, b) => (a.fightDate ?? '').localeCompare(b.fightDate ?? ''));
+  years.push({ year, bouts, rows: Math.min(bouts.length, MAX_ROWS) });
+}
+
+const tallest = Math.max(1, ...years.map((y) => y.rows));
+const busiest = [...years].sort((a, b) => b.bouts.length - a.bouts.length)[0];
+const titleFights = dated.filter((f) => f.titleFight).length;
+---
+
+<Base title="Timeline" description="Every fight in the log, placed on a timeline by year.">
+  <header class="wrap page-head">
+    <p class="kicker">
+      {dated.length > 0 && <span>{first === last ? first : `${first}–${last}`}</span>}
+      <span>{dated.length} bouts</span>
+      {busiest && busiest.bouts.length > 1 && <span>Busiest year {busiest.year}</span>}
+    </p>
+    <h1>Timeline</h1>
+  </header>
+
+  <section class="wrap">
+    {
+      dated.length === 0 ? (
+        <div class="empty">
+          <strong>Nothing on the timeline</strong>
+          Fights need a Fight Date or Year to appear here.
+        </div>
+      ) : (
+        <>
+          <ul class="legend" aria-label="Legend">
+            <li><span class="dot" />Bout</li>
+            {titleFights > 0 && <li><span class="dot dot--title" />Title fight</li>}
+            <li class="hint">Each dot is one fight · taller stacks are busier years</li>
+          </ul>
+
+          <div class="scroll" data-timeline tabindex="0" role="group" aria-label={`Fights by year, ${first} to ${last}`}>
+            <ol class="track" style={`--plot:${tallest * ROW + 28}px; --row:${ROW}px`}>
+              {years.map(({ year, bouts, rows }) => (
+                <li class:list={['year', { 'year--decade': year % 10 === 0 }]}>
+                  <div class="stack" style={`grid-template-rows:repeat(${Math.max(rows, 1)}, var(--row))`}>
+                    {bouts.map((fight) => (
+                      <a
+                        class="hit"
+                        href={fightUrl(fight)}
+                        aria-label={`${fight.title}, ${formatDate(fight.fightDate) ?? year}`}
+                        data-dot
+                        data-title={fight.title}
+                        data-meta={[formatDate(fight.fightDate) ?? year, fight.weightClass, resultLine(fight)].filter(Boolean).join(' · ')}
+                        data-gloves={fight.rating == null ? '' : fight.rating === 0 ? '0 gloves' : '🥊'.repeat(fight.rating)}
+                        data-belt={fight.titleFight ? 'Title fight' : ''}
+                      >
+                        <span class:list={['dot', { 'dot--title': fight.titleFight }]} />
+                      </a>
+                    ))}
+                  </div>
+                  <span class="tick">{year % 5 === 0 || ((year === first || year === last) && [2, 3].includes(year % 5)) ? year : ''}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {undated > 0 && (
+            <p class="label note">
+              {undated} {undated === 1 ? 'fight has' : 'fights have'} no date and {undated === 1 ? 'is' : 'are'} not shown.
+            </p>
+          )}
+        </>
+      )
+    }
+  </section>
+
+  <div class="tip" data-tip hidden>
+    <span class="belt" data-tip-belt></span>
+    <strong data-tip-title></strong>
+    <span class="label" data-tip-meta></span>
+    <span data-tip-gloves></span>
+  </div>
+</Base>
+
+<script>
+  const tip = document.querySelector<HTMLElement>('[data-tip]');
+  const scroller = document.querySelector<HTMLElement>('[data-timeline]');
+
+  if (tip && scroller) {
+    const part = (name: string) => tip.querySelector<HTMLElement>(`[data-tip-${name}]`)!;
+
+    const show = (dot: HTMLElement) => {
+      const d = dot.dataset;
+      part('title').textContent = d.title ?? '';
+      part('meta').textContent = d.meta ?? '';
+      part('gloves').textContent = d.gloves ?? '';
+      part('belt').textContent = d.belt ?? '';
+      part('belt').hidden = !d.belt;
+      tip.hidden = false;
+
+      // Sit above the dot, flipping below and clamping sideways to stay on screen.
+      const r = dot.getBoundingClientRect();
+      const t = tip.getBoundingClientRect();
+      const x = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
+      const above = r.top - t.height - 8;
+      tip.style.left = `${x}px`;
+      tip.style.top = `${above >= 8 ? above : r.bottom + 8}px`;
+    };
+    const hide = () => (tip.hidden = true);
+
+    for (const dot of scroller.querySelectorAll<HTMLElement>('[data-dot]')) {
+      dot.addEventListener('pointerenter', () => show(dot));
+      dot.addEventListener('pointerleave', hide);
+      dot.addEventListener('focus', () => show(dot));
+      dot.addEventListener('blur', hide);
+    }
+    scroller.addEventListener('scroll', hide, { passive: true });
+    window.addEventListener('scroll', hide, { passive: true });
+  }
+</script>
+
+<style>
+  .legend {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 1.4rem;
+    font-family: var(--label);
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  .legend .hint {
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .scroll {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--red);
+    padding: 1rem 1.25rem 0.9rem;
+  }
+
+  .track {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    min-width: max-content;
+  }
+
+  .year {
+    flex: 1 0 auto;
+    min-width: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* The stack is centred on the timeline, so busy years stretch above and below it. */
+  .stack {
+    width: 100%;
+    height: var(--plot);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--row);
+    align-content: center;
+    justify-content: center;
+    background: linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat;
+  }
+
+  .year--decade .stack {
+    background:
+      linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat,
+      linear-gradient(rgba(22, 19, 15, 0.08), rgba(22, 19, 15, 0.08)) center / 1px 100% no-repeat;
+  }
+
+  .hit {
+    display: grid;
+    place-items: center;
+    width: var(--row);
+    height: var(--row);
+  }
+
+  .dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--red);
+    /* ink ring keeps neighbouring dots and the axis line visually separate */
+    box-shadow: 0 0 0 2px var(--surface);
+    transition: transform 0.12s;
+  }
+
+  .dot--title {
+    background: var(--text);
+  }
+
+  .hit:hover .dot,
+  .hit:focus-visible .dot {
+    transform: scale(1.35);
+    box-shadow:
+      0 0 0 2px var(--surface),
+      0 0 0 4px var(--text);
+  }
+
+  .hit:focus-visible {
+    outline: none;
+  }
+
+  .tick {
+    /* zero width so a label never widens its year column */
+    width: 0;
+    display: flex;
+    justify-content: center;
+    height: 1.4rem;
+    margin-top: 0.5rem;
+    font-family: var(--label);
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .year--decade .tick {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .note {
+    margin: 1rem 0 0;
+  }
+
+  .tip {
+    position: fixed;
+    z-index: 60;
+    max-width: min(300px, calc(100vw - 16px));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    padding: 0.7rem 0.85rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--text);
+    pointer-events: none;
+  }
+
+  .tip strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.35rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+  }
+
+  .tip .label {
+    letter-spacing: 0.12em;
+  }
+
+  @media (max-width: 640px) {
+    .legend .hint {
+      margin-left: 0;
+      flex-basis: 100%;
+    }
+  }
+</style>

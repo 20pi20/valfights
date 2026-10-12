@@ -1,0 +1,274 @@
+:root {
+  /* Letterpress fight poster: black and red ink on aged paper */
+  --bg: #f3ead7;
+  --surface: #fbf6ea;
+  --surface-2: #e8dec7;
+  --line: #d3c7ac;
+  --text: #16130f;
+  --muted: #6a5f51;
+  --red: #c8201a;
+  --red-deep: #a01712;
+  --gold: #e8b53a;
+  --on-red: #fff;
+  --on-gold: #16130f;
+
+  --display: 'Anton', 'Impact', 'Haettenschweiler', sans-serif;
+  --label: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --body: 'Barlow', system-ui, sans-serif;
+
+  --gutter: clamp(16px, 4vw, 48px);
+  --max: 1320px;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1100px 520px at 50% -160px, rgba(200, 32, 26, 0.1), transparent 70%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Printed-poster grain over everything */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.09;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--red);
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  color: var(--red);
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  font-weight: 400;
+  text-transform: uppercase;
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ---------- Small type ---------- */
+
+.label {
+  font-family: var(--label);
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kicker {
+  font-family: var(--label);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--red);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em 0.9em;
+  align-items: center;
+}
+
+.kicker > * + *::before {
+  content: '★';
+  color: var(--text);
+  margin-right: 0.9em;
+  font-size: 0.8em;
+}
+
+.kicker > .belt::before {
+  content: none;
+}
+
+.vs {
+  font-family: var(--display);
+  color: var(--red);
+  font-style: normal;
+}
+
+.belt {
+  display: inline-block;
+  font-family: var(--label);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--on-gold);
+  background: var(--gold);
+  padding: 0.2em 0.6em 0.15em;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--label);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 0.6em 1em 0.55em;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.btn {
+  background: var(--surface);
+}
+
+.btn:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.btn--red {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--on-red);
+}
+
+.btn--red:hover {
+  background: var(--red-deep);
+  border-color: var(--red-deep);
+  color: var(--on-red);
+}
+
+/* ---------- Page headings ---------- */
+
+.page-head {
+  padding-block: clamp(36px, 7vw, 84px) clamp(24px, 4vw, 44px);
+}
+
+.page-head h1 {
+  font-size: clamp(3.2rem, 11vw, 9rem);
+  margin-top: 0.12em;
+}
+
+.page-head .lede {
+  max-width: 56ch;
+  color: var(--muted);
+  margin-top: 1.1em;
+  margin-bottom: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7em;
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  margin-bottom: 0.7em;
+  padding-top: 0.5em;
+  border-top: 4px solid var(--red);
+}
+
+.section-title small {
+  font-family: var(--label);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+
+/* ---------- Poster grid ---------- */
+
+.poster-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: clamp(12px, 1.6vw, 22px);
+}
+
+.empty {
+  border: 1px dashed var(--line);
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty strong {
+  display: block;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 2rem;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 0.3em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,0 +1,162 @@
+---
+import Base from '../../layouts/Base.astro';
+import FightCard from '../../components/FightCard.astro';
+import { countBy, fighters, fighterUrl, outcomeFor, type Fighter } from '../../lib/data';
+
+export function getStaticPaths() {
+  return fighters.map((fighter) => ({ params: { slug: fighter.slug }, props: { fighter } }));
+}
+
+interface Props {
+  fighter: Fighter;
+}
+
+const { fighter } = Astro.props;
+const total = fighter.fights.length;
+const years = fighter.fights.map((f) => f.year).filter((y): y is number => y != null);
+const span = years.length ? [Math.min(...years), Math.max(...years)] : null;
+const titleFights = fighter.fights.filter((f) => f.titleFight).length;
+const opponents = countBy(
+  fighter.fights.flatMap((f) => f.fighters.filter((name) => name !== fighter.name)),
+  (name) => name,
+);
+---
+
+<Base title={fighter.name} description={`${fighter.name}: ${total} ${total === 1 ? 'bout' : 'bouts'} in the log.`}>
+  <header class="wrap page-head">
+    <p class="kicker">
+      <span>Fighter</span>
+      {fighter.weightClasses.map((w) => <span>{w}</span>)}
+      {span && <span>{span[0] === span[1] ? span[0] : `${span[0]}–${span[1]}`}</span>}
+    </p>
+    <h1>{fighter.name}</h1>
+  </header>
+
+  <section class="wrap tiles">
+    <div class="tile tile--record">
+      <span class="label">Record in this log</span>
+      <strong>{fighter.wins}<i>–</i>{fighter.losses}<i>–</i>{fighter.draws}</strong>
+      <span class="label">W – L – D</span>
+    </div>
+    <div class="tile">
+      <span class="label">Bouts watched</span>
+      <strong>{total}</strong>
+    </div>
+    <div class="tile">
+      <span class="label">Wins by stoppage</span>
+      <strong>{fighter.stoppageWins}</strong>
+    </div>
+    <div class="tile">
+      <span class="label">Title fights</span>
+      <strong>{titleFights}</strong>
+    </div>
+    <div class="tile">
+      <span class="label">Avg rating</span>
+      <strong>{fighter.avgRating == null ? '—' : fighter.avgRating.toFixed(1)}<small> / 3</small></strong>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <h2 class="section-title">Bouts <small>{total}</small></h2>
+    <ul class="poster-grid">
+      {
+        fighter.fights.map((fight) => (
+          <li>
+            <FightCard fight={fight} outcome={outcomeFor(fight, fighter.name)} />
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  {
+    opponents.length > 0 && (
+      <section class="wrap opponents">
+        <h2 class="section-title">Opponents</h2>
+        <ul>
+          {opponents.map((o) => (
+            <li>
+              <a class="btn" href={fighterUrl(o.label)}>
+                {o.label}
+                {o.value > 1 && <span class="times">×{o.value}</span>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    margin-bottom: clamp(36px, 5vw, 64px);
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.1rem 1.2rem 1.2rem;
+    background: var(--surface);
+    outline: 1px solid var(--line);
+  }
+
+  .tile strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    line-height: 1;
+  }
+
+  .tile small {
+    font-family: var(--label);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .tile--record {
+    grid-column: span 2;
+    color: var(--on-red);
+    background: var(--red);
+    outline-color: var(--red);
+  }
+
+  .tile--record .label {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .tile--record i {
+    font-style: normal;
+    opacity: 0.55;
+    margin-inline: 0.08em;
+  }
+
+  .opponents {
+    margin-top: clamp(40px, 6vw, 72px);
+  }
+
+  .opponents ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .times {
+    color: var(--red);
+  }
+
+  @media (max-width: 420px) {
+    .tile--record {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

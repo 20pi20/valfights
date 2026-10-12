@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Set these in Netlify → Site configuration → Environment variables:
+#   NOTION_TOKEN          internal integration secret
+#   NOTION_DATABASE_ID    the boxing database ID (or its full URL)

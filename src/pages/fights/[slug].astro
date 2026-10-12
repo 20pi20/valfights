@@ -1,0 +1,364 @@
+---
+import Base from '../../layouts/Base.astro';
+import Gloves from '../../components/Gloves.astro';
+import { fighterUrl, fights, fightUrl, formatDate, splitTitle, winnerOf, type Fight } from '../../lib/data';
+
+export function getStaticPaths() {
+  return fights.map((fight, i) => ({
+    params: { slug: fight.slug },
+    props: { fight, newer: fights[i - 1] ?? null, older: fights[i + 1] ?? null },
+  }));
+}
+
+interface Props {
+  fight: Fight;
+  newer: Fight | null;
+  older: Fight | null;
+}
+
+const { fight, newer, older } = Astro.props;
+const names = splitTitle(fight.title);
+const winner = winnerOf(fight);
+const long = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' } as const;
+const embed = fight.youtubeId
+  ? `https://www.youtube-nocookie.com/embed/${fight.youtubeId}?rel=0${fight.youtubeStart ? `&start=${fight.youtubeStart}` : ''}`
+  : null;
+const round = fight.round == null ? null : typeof fight.round === 'number' ? `Round ${fight.round}` : fight.round;
+const description = [fight.weightClass, formatDate(fight.fightDate), fight.winner && `Winner: ${fight.winner}`].filter(Boolean).join(' · ');
+---
+
+<Base title={fight.title} description={description || undefined}>
+  <article>
+    <header class="wrap page-head">
+      <p class="kicker">
+        <span>{formatDate(fight.fightDate, long) ?? fight.year ?? 'Date unknown'}</span>
+        {fight.weightClass && <span>{fight.weightClass}</span>}
+        {fight.titleFight && <span class="belt">Title fight</span>}
+      </p>
+      <h1>
+        {
+          names ? (
+            <>
+              <span>{names[0]}</span>
+              <em class="vs">vs</em>
+              <span>{names[1]}</span>
+            </>
+          ) : (
+            fight.title
+          )
+        }
+      </h1>
+    </header>
+
+    <div class="wrap layout">
+      <div class="main">
+        {
+          embed ? (
+            <div class="video">
+              <iframe
+                src={embed}
+                title={`${fight.title} — video`}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen
+              />
+            </div>
+          ) : (
+            <div class="video video--none">
+              <p class="label">{fight.link ? 'This link can’t be embedded' : 'No video linked'}</p>
+            </div>
+          )
+        }
+
+        <div class="actions">
+          {
+            fight.link && (
+              <a class="btn btn--red" href={fight.link} target="_blank" rel="noopener noreferrer">
+                {fight.youtubeId ? 'Watch on YouTube' : 'Open link'} ↗
+              </a>
+            )
+          }
+          {
+            fight.notionUrl && (
+              <a class="btn" href={fight.notionUrl} target="_blank" rel="noopener noreferrer">
+                Edit in Notion ↗
+              </a>
+            )
+          }
+        </div>
+
+        {
+          fight.notes && (
+            <section class="notes">
+              <h2 class="section-title">Ringside notes</h2>
+              <p>{fight.notes}</p>
+            </section>
+          )
+        }
+      </div>
+
+      <aside class="tape" aria-label="Fight details">
+        <h2 class="label">Tale of the tape</h2>
+        <dl>
+          <div class="row row--winner">
+            <dt>Winner</dt>
+            <dd>{winner ? <a href={fighterUrl(winner)}>{winner}</a> : (fight.winner ?? '—')}</dd>
+          </div>
+          <div class="row">
+            <dt>Method</dt>
+            <dd>{fight.method ?? '—'}</dd>
+          </div>
+          <div class="row">
+            <dt>Round</dt>
+            <dd>{round ?? '—'}</dd>
+          </div>
+          <div class="row">
+            <dt>Rating</dt>
+            <dd class="rating"><Gloves rating={fight.rating} /></dd>
+          </div>
+          <div class="row">
+            <dt>Weight class</dt>
+            <dd>{fight.weightClass ?? '—'}</dd>
+          </div>
+          <div class="row">
+            <dt>Fight date</dt>
+            <dd>{formatDate(fight.fightDate) ?? fight.year ?? '—'}</dd>
+          </div>
+          <div class="row">
+            <dt>Watched</dt>
+            <dd>{formatDate(fight.watchedDate) ?? 'Not yet'}</dd>
+          </div>
+        </dl>
+
+        {
+          fight.fighters.length > 0 && (
+            <>
+              <h2 class="label corner-title">In the ring</h2>
+              <ul class="corners">
+                {fight.fighters.map((name) => (
+                  <li>
+                    <a href={fighterUrl(name)}>
+                      <span>{name}</span>
+                      <span aria-hidden="true">→</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )
+        }
+      </aside>
+    </div>
+
+    <nav class="wrap pager" aria-label="More fights">
+      {
+        older ? (
+          <a href={fightUrl(older)}>
+            <span class="label">← Earlier fight</span>
+            <strong>{older.title}</strong>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        newer && (
+          <a class="next" href={fightUrl(newer)}>
+            <span class="label">Later fight →</span>
+            <strong>{newer.title}</strong>
+          </a>
+        )
+      }
+    </nav>
+  </article>
+</Base>
+
+<style>
+  h1 {
+    display: flex;
+    flex-direction: column;
+    overflow-wrap: anywhere;
+  }
+
+  .page-head h1 {
+    font-size: clamp(3rem, 10.5vw, 8.5rem);
+  }
+
+  h1 .vs {
+    font-size: 0.36em;
+    line-height: 1.5;
+    letter-spacing: 0.14em;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+    gap: clamp(20px, 3vw, 44px);
+    align-items: start;
+  }
+
+  .video {
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border: 1px solid var(--line);
+    box-shadow:
+      0 0 0 6px var(--bg),
+      0 0 0 7px var(--red);
+    margin: 7px;
+  }
+
+  .video iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  .video--none {
+    display: grid;
+    place-items: center;
+    background:
+      repeating-linear-gradient(135deg, rgba(22, 19, 15, 0.05) 0 2px, transparent 2px 14px),
+      var(--surface);
+  }
+
+  .video--none p {
+    margin: 0;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1.4rem;
+  }
+
+  .notes {
+    margin-top: clamp(28px, 4vw, 48px);
+  }
+
+  .notes p {
+    white-space: pre-line;
+    max-width: 68ch;
+    font-size: 1.1rem;
+  }
+
+  .tape {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--red);
+    padding: 1.2rem 1.2rem 1.3rem;
+  }
+
+  .tape h2 {
+    font-family: var(--label);
+    line-height: 1.4;
+  }
+
+  dl {
+    margin: 0.6rem 0 0;
+  }
+
+  .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.6rem;
+    border-top: 1px solid var(--line);
+  }
+
+  dt {
+    font-family: var(--label);
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .row--winner dd {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.6rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+  }
+
+  .rating {
+    font-size: 1.25rem;
+  }
+
+  .corner-title {
+    margin-top: 1.5rem;
+  }
+
+  .corners {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+  }
+
+  .corners a {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.6rem;
+    border-top: 1px solid var(--line);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .corners a:hover {
+    color: var(--red);
+  }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: clamp(40px, 6vw, 80px);
+  }
+
+  .pager a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    text-decoration: none;
+    min-width: 0;
+  }
+
+  .pager a:hover {
+    border-color: var(--red);
+  }
+
+  .pager strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.2rem, 2.4vw, 1.8rem);
+    line-height: 1.05;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+
+  .pager .next {
+    text-align: right;
+    grid-column: 2;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,337 @@
+---
+import Base from '../layouts/Base.astro';
+import FightCard from '../components/FightCard.astro';
+import { SITE } from '../config';
+import { countBy, fighters, fights } from '../lib/data';
+
+const weights = countBy(fights, (f) => f.weightClass);
+const methods = countBy(fights, (f) => f.method);
+const years = [...new Set(fights.map((f) => f.year).filter(Boolean))].sort((a, b) => b! - a!);
+const fighterNames = fighters.map((f) => f.name).sort((a, b) => a.localeCompare(b));
+const watched = fights.filter((f) => f.watchedDate).length;
+---
+
+<Base>
+  <section class="wrap page-head">
+    <p class="kicker"><span>{fights.length} bouts</span><span>{fighters.length} fighters</span><span>{watched} watched</span></p>
+    <h1>{SITE.title}</h1>
+    <p class="lede">{SITE.tagline}.</p>
+  </section>
+
+  <section class="wrap">
+    <form class="filters" data-filters role="search" aria-label="Filter fights">
+      <label class="field field--search">
+        <span class="label">Search</span>
+        <input type="search" name="q" placeholder="Fighter, fight, notes…" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="label">Fighter</span>
+        <select name="fighter">
+          <option value="">All fighters</option>
+          {fighterNames.map((name) => <option value={name}>{name}</option>)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Weight class</span>
+        <select name="weight">
+          <option value="">All weights</option>
+          {weights.map((w) => <option value={w.label}>{w.label} ({w.value})</option>)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Year</span>
+        <select name="year">
+          <option value="">All years</option>
+          {years.map((y) => <option value={y}>{y}</option>)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Method</span>
+        <select name="method">
+          <option value="">All methods</option>
+          {methods.map((m) => <option value={m.label}>{m.label} ({m.value})</option>)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Rating</span>
+        <select name="rating">
+          <option value="">Any rating</option>
+          <option value="3">🥊🥊🥊</option>
+          <option value="2">🥊🥊</option>
+          <option value="1">🥊</option>
+          <option value="0">0 gloves</option>
+          {fights.some((f) => f.rating == null) && <option value="none">Unrated</option>}
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Sort</span>
+        <select name="sort">
+          <option value="">Newest fight</option>
+          <option value="oldest">Oldest fight</option>
+          <option value="watched">Recently watched</option>
+          <option value="rating">Highest rated</option>
+          <option value="name">A–Z</option>
+        </select>
+      </label>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" name="title" value="1" /><span>Title fights</span></label>
+        <label class="toggle"><input type="checkbox" name="video" value="1" /><span>Has video</span></label>
+        <label class="toggle"><input type="checkbox" name="unwatched" value="1" /><span>Not watched</span></label>
+      </div>
+    </form>
+
+    <div class="result-bar">
+      <p class="label" aria-live="polite"><strong data-count>{fights.length}</strong> <span data-count-noun>{fights.length === 1 ? 'bout' : 'bouts'}</span></p>
+      <button class="btn" type="button" data-reset hidden>Clear filters</button>
+    </div>
+
+    <ul class="poster-grid" data-grid>
+      {
+        fights.map((fight) => (
+          <li
+            data-card
+            data-search={[fight.title, ...fight.fighters, fight.weightClass, fight.method, fight.winner, fight.year, fight.notes]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()}
+            data-fighters={`|${fight.fighters.join('|')}|`}
+            data-weight={fight.weightClass ?? ''}
+            data-year={fight.year ?? ''}
+            data-method={fight.method ?? ''}
+            data-rating={fight.rating ?? 'none'}
+            data-title={fight.titleFight ? '1' : ''}
+            data-video={fight.youtubeId ? '1' : ''}
+            data-date={fight.fightDate ?? ''}
+            data-watched={fight.watchedDate ?? ''}
+            data-name={fight.title.toLowerCase()}
+          >
+            <FightCard fight={fight} />
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="empty" data-empty hidden={fights.length > 0}>
+      <strong>No bouts on this card</strong>
+      {fights.length > 0 ? 'Nothing matches those filters.' : 'The database is empty.'}
+    </div>
+  </section>
+</Base>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('[data-filters]')!;
+  const grid = document.querySelector<HTMLElement>('[data-grid]')!;
+  const cards = [...grid.querySelectorAll<HTMLElement>('[data-card]')];
+  const count = document.querySelector<HTMLElement>('[data-count]')!;
+  const noun = document.querySelector<HTMLElement>('[data-count-noun]')!;
+  const empty = document.querySelector<HTMLElement>('[data-empty]')!;
+  const reset = document.querySelector<HTMLButtonElement>('[data-reset]')!;
+
+  const desc = (a: string, b: string) => b.localeCompare(a);
+  // Ascending, but blanks always sink to the end.
+  const asc = (a: string, b: string) => (a && b ? a.localeCompare(b) : a ? -1 : b ? 1 : 0);
+  const ratingOf = (el: HTMLElement) => (el.dataset.rating === 'none' ? -1 : Number(el.dataset.rating));
+
+  const sorters: Record<string, (a: HTMLElement, b: HTMLElement) => number> = {
+    '': (a, b) => desc(a.dataset.date!, b.dataset.date!),
+    oldest: (a, b) => asc(a.dataset.date!, b.dataset.date!),
+    watched: (a, b) => desc(a.dataset.watched!, b.dataset.watched!),
+    rating: (a, b) => ratingOf(b) - ratingOf(a) || desc(a.dataset.date!, b.dataset.date!),
+    name: (a, b) => a.dataset.name!.localeCompare(b.dataset.name!),
+  };
+
+  function readState() {
+    const state: Record<string, string> = {};
+    for (const [key, value] of new FormData(form)) {
+      if (typeof value === 'string' && value.trim() !== '') state[key] = value;
+    }
+    return state;
+  }
+
+  function apply(syncUrl = true) {
+    const s = readState();
+    const terms = (s.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+
+    for (const card of cards) {
+      const d = card.dataset;
+      const match =
+        terms.every((t) => d.search!.includes(t)) &&
+        (!s.fighter || d.fighters!.includes(`|${s.fighter}|`)) &&
+        (!s.weight || d.weight === s.weight) &&
+        (!s.year || d.year === s.year) &&
+        (!s.method || d.method === s.method) &&
+        (!s.rating || d.rating === s.rating) &&
+        (!s.title || d.title === '1') &&
+        (!s.video || d.video === '1') &&
+        (!s.unwatched || d.watched === '');
+      card.hidden = !match;
+      if (match) shown++;
+    }
+
+    grid.append(...[...cards].sort(sorters[s.sort ?? ''] ?? sorters['']));
+    count.textContent = String(shown);
+    noun.textContent = shown === 1 ? 'bout' : 'bouts';
+    empty.hidden = shown > 0;
+    reset.hidden = Object.keys(s).filter((k) => k !== 'sort').length === 0;
+
+    if (syncUrl) {
+      const query = new URLSearchParams(s).toString();
+      history.replaceState(null, '', query ? `?${query}` : location.pathname);
+    }
+  }
+
+  // Restore filters from the URL so filtered views can be linked and shared.
+  for (const [key, value] of new URLSearchParams(location.search)) {
+    const field = form.elements.namedItem(key);
+    if (field instanceof HTMLInputElement && field.type === 'checkbox') field.checked = value === field.value;
+    else if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) field.value = value;
+  }
+
+  form.addEventListener('input', () => apply());
+  form.addEventListener('submit', (event) => event.preventDefault());
+  reset.addEventListener('click', () => {
+    const sort = (form.elements.namedItem('sort') as HTMLSelectElement).value;
+    form.reset();
+    (form.elements.namedItem('sort') as HTMLSelectElement).value = sort;
+    apply();
+  });
+  apply(false);
+</script>
+
+<style>
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.9rem 0.8rem;
+    padding: 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--red);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .field--search {
+    grid-column: span 2;
+  }
+
+  input[type='search'],
+  select {
+    width: 100%;
+    height: 2.6rem;
+    padding: 0 0.7rem;
+    font: 500 1rem var(--body);
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0;
+  }
+
+  select {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 17px) 55%,
+      calc(100% - 12px) 55%;
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
+    text-overflow: ellipsis;
+  }
+
+  input[type='search']::placeholder {
+    color: var(--muted);
+  }
+
+  input[type='search']:hover,
+  select:hover {
+    border-color: var(--muted);
+  }
+
+  .toggles {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .toggle {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .toggle input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .toggle span {
+    display: block;
+    font-family: var(--label);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 0.5em 0.9em 0.45em;
+  }
+
+  .toggle:hover span {
+    border-color: var(--muted);
+  }
+
+  .toggle input:checked + span {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--bg);
+  }
+
+  .toggle input:focus-visible + span {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+  }
+
+  .result-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2.6rem;
+    margin-block: 1.2rem 0.9rem;
+  }
+
+  .result-bar p {
+    margin: 0;
+  }
+
+  .result-bar strong {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.9rem;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    vertical-align: -0.08em;
+    margin-right: 0.15em;
+  }
+
+  .empty {
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 520px) {
+    .filters {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,201 @@
+---
+import Gloves from './Gloves.astro';
+import { fightUrl, formatDate, resultLine, splitTitle, type Fight, type Outcome } from '../lib/data';
+
+interface Props {
+  fight: Fight;
+  /** Result from one fighter's point of view, shown on fighter pages. */
+  outcome?: Outcome | null;
+}
+
+const { fight, outcome } = Astro.props;
+const names = splitTitle(fight.title);
+const date = formatDate(fight.fightDate) ?? (fight.year ? String(fight.year) : 'Date unknown');
+const outcomeLabel = { W: 'Win', L: 'Loss', D: 'Draw', NC: 'No contest' };
+---
+
+<a class="card" href={fightUrl(fight)}>
+  <div class="art" aria-hidden="true">
+    {
+      fight.youtubeId ? (
+        <img src={`https://i.ytimg.com/vi/${fight.youtubeId}/hqdefault.jpg`} alt="" loading="lazy" decoding="async" />
+      ) : (
+        fight.year && <span class="ghost">{fight.year}</span>
+      )
+    }
+  </div>
+
+  <div class="body">
+    <div class="top">
+      <span class="date">{date}</span>
+      {fight.titleFight && <span class="belt">Title fight</span>}
+    </div>
+    {outcome && <span class={`outcome outcome--${outcome}`}>{outcomeLabel[outcome]}</span>}
+    <h3>
+      {
+        names ? (
+          <>
+            <span>{names[0]}</span>
+            <em class="vs">vs</em>
+            <span>{names[1]}</span>
+          </>
+        ) : (
+          <span>{fight.title}</span>
+        )
+      }
+    </h3>
+    <div class="foot">
+      <span class="meta">{[fight.weightClass, resultLine(fight)].filter(Boolean).join(' · ') || '—'}</span>
+      <Gloves rating={fight.rating} />
+    </div>
+  </div>
+</a>
+
+<style>
+  .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    text-decoration: none;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    color: var(--text);
+    border-color: var(--text);
+    transform: translateY(-3px);
+    box-shadow: 5px 5px 0 var(--red);
+  }
+
+  /* Poster artwork: the video thumbnail as a two-colour print, black over red */
+  .art {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--red);
+    border-bottom: 3px solid var(--text);
+  }
+
+  .art img {
+    width: 100%;
+    height: 100%;
+    /* hqdefault thumbnails are 4:3 with letterbox bars; cover crops them away */
+    object-fit: cover;
+    filter: grayscale(1) contrast(1.2) brightness(1.15);
+    mix-blend-mode: multiply;
+    transition: filter 0.3s;
+  }
+
+  .card:hover .art img {
+    filter: none;
+    mix-blend-mode: normal;
+  }
+
+  /* No thumbnail: the year, set huge and outlined, stands in for artwork */
+  .art:has(.ghost) {
+    background:
+      repeating-linear-gradient(135deg, rgba(22, 19, 15, 0.05) 0 2px, transparent 2px 14px),
+      var(--surface-2);
+  }
+
+  .ghost {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--display);
+    font-size: clamp(4.5rem, 8vw, 6rem);
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(22, 19, 15, 0.3);
+  }
+
+  .body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.8rem 0.9rem 0.85rem;
+  }
+
+  .top {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 1.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .date,
+  .meta {
+    font-family: var(--label);
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h3 {
+    display: flex;
+    flex-direction: column;
+    font-size: clamp(1.75rem, 2.2vw + 1rem, 2.35rem);
+    overflow-wrap: anywhere;
+  }
+
+  h3 .vs {
+    font-size: 0.5em;
+    line-height: 1.5;
+    letter-spacing: 0.12em;
+  }
+
+  .foot {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.95rem;
+  }
+
+  /* the footer is pinned to the bottom; this keeps a minimum gap above it */
+  h3 {
+    margin-bottom: 0.8rem;
+  }
+
+  .meta {
+    font-size: 0.76rem;
+    letter-spacing: 0.12em;
+  }
+
+  .outcome {
+    margin-bottom: 0.5rem;
+    font-family: var(--label);
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    padding: 0.2em 0.6em 0.15em;
+    border: 1px solid currentColor;
+    color: var(--muted);
+  }
+
+  .outcome--W {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--bg);
+  }
+
+  .outcome--L {
+    color: var(--text);
+  }
+</style>
