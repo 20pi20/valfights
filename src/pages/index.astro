@@ -82,10 +82,16 @@ const watched = fights.filter((f) => f.watchedDate).length;
 
     <div class="result-bar">
       <p class="label" aria-live="polite"><strong data-count>{fights.length}</strong> <span data-count-noun>{fights.length === 1 ? 'bout' : 'bouts'}</span></p>
-      <button class="btn" type="button" data-reset hidden>Clear filters</button>
+      <div class="result-actions">
+        <button class="btn" type="button" data-reset hidden>Clear filters</button>
+        <div class="view-toggle" role="group" aria-label="View">
+          <button type="button" data-view-btn="grid" aria-pressed="true">Grid</button>
+          <button type="button" data-view-btn="list" aria-pressed="false">List</button>
+        </div>
+      </div>
     </div>
 
-    <ul class="poster-grid" data-grid>
+    <ul class="poster-grid" data-grid data-view="grid">
       {
         fights.map((fight) => (
           <li
@@ -110,6 +116,12 @@ const watched = fights.filter((f) => f.watchedDate).length;
         ))
       }
     </ul>
+    <!-- Runs before paint so a saved list preference doesn't flash the grid first. -->
+    <script is:inline>
+      try {
+        if (localStorage.getItem('fights-view') === 'list') document.querySelector('[data-grid]').dataset.view = 'list';
+      } catch {}
+    </script>
 
     <div class="empty" data-empty hidden={fights.length > 0}>
       <strong>No bouts on this card</strong>
@@ -197,6 +209,21 @@ const watched = fights.filter((f) => f.watchedDate).length;
     apply();
   });
   apply(false);
+
+  const viewButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-view-btn]')];
+
+  function setView(view: string, save = true) {
+    grid.dataset.view = view;
+    for (const button of viewButtons) button.setAttribute('aria-pressed', String(button.dataset.viewBtn === view));
+    if (save) {
+      try {
+        localStorage.setItem('fights-view', view);
+      } catch {}
+    }
+  }
+
+  for (const button of viewButtons) button.addEventListener('click', () => setView(button.dataset.viewBtn!));
+  setView(grid.dataset.view === 'list' ? 'list' : 'grid', false);
 </script>
 
 <style>
@@ -323,6 +350,50 @@ const watched = fights.filter((f) => f.watchedDate).length;
     color: var(--text);
     vertical-align: -0.08em;
     margin-right: 0.15em;
+  }
+
+  .result-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .view-toggle {
+    display: flex;
+  }
+
+  .view-toggle button {
+    font-family: var(--label);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 0.6em 0.9em 0.55em;
+    cursor: pointer;
+  }
+
+  .view-toggle button + button {
+    margin-left: -1px;
+  }
+
+  .view-toggle button:hover {
+    color: var(--text);
+  }
+
+  .view-toggle button[aria-pressed='true'] {
+    position: relative;
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--bg);
+  }
+
+  .poster-grid[data-view='list'] {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .empty {

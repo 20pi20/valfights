@@ -198,4 +198,73 @@ const outcomeLabel = { W: 'Win', L: 'Loss', D: 'Draw', NC: 'No contest' };
   .outcome--L {
     color: var(--text);
   }
+
+  /* List view (fights page toggle): the same card laid out as a compact row */
+  :global([data-view='list']) .card {
+    flex-direction: row;
+  }
+
+  :global([data-view='list']) .card:hover {
+    transform: none;
+    box-shadow: 4px 4px 0 var(--red);
+  }
+
+  :global([data-view='list']) .art {
+    flex: none;
+    width: clamp(84px, 13vw, 150px);
+    aspect-ratio: auto;
+    min-height: 4.2rem;
+    border-bottom: 0;
+    border-right: 3px solid var(--text);
+  }
+
+  :global([data-view='list']) .ghost {
+    font-size: 1.9rem;
+    -webkit-text-stroke-width: 1px;
+  }
+
+  :global([data-view='list']) .body {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 21rem);
+    align-items: center;
+    gap: 0.35rem 1.2rem;
+    min-width: 0;
+    padding: 0.6rem 0.9rem;
+  }
+
+  :global([data-view='list']) .top {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  :global([data-view='list']) h3 {
+    flex-flow: row wrap;
+    align-items: baseline;
+    gap: 0 0.4em;
+    font-size: 1.4rem;
+    line-height: 1.1;
+    margin-bottom: 0;
+  }
+
+  :global([data-view='list']) .foot {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  @media (max-width: 800px) {
+    :global([data-view='list']) .body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    :global([data-view='list']) .top {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
 </style>
