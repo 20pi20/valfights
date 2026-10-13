@@ -3,20 +3,11 @@ import Base from '../../layouts/Base.astro';
 import Gloves from '../../components/Gloves.astro';
 import { fighterUrl, fights, fightUrl, formatDate, splitTitle, winnerOf, type Fight } from '../../lib/data';
 
-export function getStaticPaths() {
-  return fights.map((fight, i) => ({
-    params: { slug: fight.slug },
-    props: { fight, newer: fights[i - 1] ?? null, older: fights[i + 1] ?? null },
-  }));
-}
-
-interface Props {
-  fight: Fight;
-  newer: Fight | null;
-  older: Fight | null;
-}
-
-const { fight, newer, older } = Astro.props;
+const index = fights.findIndex((f) => f.slug === Astro.params.slug);
+if (index === -1) return Astro.rewrite('/404');
+const fight: Fight = fights[index];
+const newer = fights[index - 1] ?? null;
+const older = fights[index + 1] ?? null;
 const names = splitTitle(fight.title);
 const winner = winnerOf(fight);
 const long = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' } as const;

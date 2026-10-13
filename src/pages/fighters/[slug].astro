@@ -3,15 +3,8 @@ import Base from '../../layouts/Base.astro';
 import FightCard from '../../components/FightCard.astro';
 import { countBy, fighters, fighterUrl, outcomeFor, type Fighter } from '../../lib/data';
 
-export function getStaticPaths() {
-  return fighters.map((fighter) => ({ params: { slug: fighter.slug }, props: { fighter } }));
-}
-
-interface Props {
-  fighter: Fighter;
-}
-
-const { fighter } = Astro.props;
+const fighter: Fighter | undefined = fighters.find((f) => f.slug === Astro.params.slug);
+if (!fighter) return Astro.rewrite('/404');
 const total = fighter.fights.length;
 const years = fighter.fights.map((f) => f.year).filter((y): y is number => y != null);
 const span = years.length ? [Math.min(...years), Math.max(...years)] : null;

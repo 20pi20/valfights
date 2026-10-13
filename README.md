@@ -1,6 +1,6 @@
 # Fight Log
 
-A static Astro site built from a Notion boxing database. On every build the database is read once and written to `src/data/fights.json`; the pages are generated from that file.
+An Astro site rendered live from a Notion boxing database. Pages are rendered on request, so an edit in Notion shows up on the next page load (within about 30 seconds) with no redeploy.
 
 - `/` — filterable, sortable fight list
 - `/fights/<slug>/` — one page per fight with the YouTube video embedded
@@ -43,41 +43,33 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:4321>. This fetches Notion first, then starts Astro with live reload for code changes.
-
-To pull fresh Notion data while the dev server is running, run `npm run fetch` in a second terminal.
-
-### Preview the production build
-
-```sh
-npm run build     # fetch Notion, then build to dist/
-npm run preview   # serve dist/ at http://localhost:4321
-```
+Open <http://localhost:4321>. Notion is read when a page is requested, so reloading the page picks up database edits. Restart the dev server after changing `.env`.
 
 ### No credentials yet?
 
-`npm run dev` still works: it writes 12 sample fights and shows a yellow "sample data" bar. Once `.env` is filled in, delete `src/data/fights.json` or just run `npm run fetch` to replace them.
+`npm run dev` still works: it shows 12 sample fights and a yellow "sample data" bar until `.env` is filled in.
 
-| Situation | What `npm run fetch` does |
+| Situation | What happens |
 | --- | --- |
-| Credentials set | Fetches Notion and overwrites `src/data/fights.json` |
-| No credentials, local | Keeps the existing file, or writes sample data if there is none |
-| Notion unreachable, local | Warns and keeps the previously fetched file |
-| No credentials or any Notion error on Netlify | Fails the build, so a broken deploy never replaces a good one |
+| Credentials set | Notion is read on page load; the result is reused for 30 seconds |
+| No credentials | Sample fights with the yellow bar (locally and on Netlify) |
+| Notion unreachable or rate-limiting | The last successfully loaded fights keep being served; if there are none yet, the page returns an error |
 
 ## Deploy to Netlify
 
-1. Push this folder to a Git repository and import it in Netlify. Build settings come from `netlify.toml` (`npm run build`, publish `dist`, Node 22).
+1. Push this folder to a Git repository and import it in Netlify. Build settings come from `netlify.toml` (`npm run build`, publish `dist`, Node 22). The `@astrojs/netlify` adapter turns the pages into a Netlify Function.
 2. In **Site configuration → Environment variables** add:
    - `NOTION_TOKEN`
    - `NOTION_DATABASE_ID`
+
+   Leave their scope on the default (all scopes): they are read by the function at runtime, not during the build.
 3. Deploy.
 
-The site only changes when it is rebuilt. After editing Notion, trigger a deploy (**Deploys → Trigger deploy**), or create a **build hook** (Site configuration → Build & deploy → Build hooks) and call that URL from a bookmark or a scheduled job.
+You only redeploy for code changes. Notion edits appear on their own; the 30-second reuse window is `MAX_AGE_MS` in `src/lib/data.ts`.
 
 ## Notion columns
 
-Column names are matched case-insensitively. A missing column is left blank and listed in the build log.
+Column names are matched case-insensitively. A missing column is left blank and listed in the function log.
 
 | Column | Notion type | Notes |
 | --- | --- | --- |
@@ -98,21 +90,23 @@ Column names are matched case-insensitively. A missing column is left blank and 
 ## Project layout
 
 ```
-scripts/fetch-notion.mjs   Notion → src/data/fights.json
-scripts/sample-data.mjs    placeholder fights used when there are no credentials
-src/data/fights.json       generated, gitignored
-src/lib/data.ts            loads the JSON; derives fighters, records and helpers
+src/middleware.ts          refreshes the Notion data before each page render
+src/lib/notion.mjs         Notion API → fight records
+src/lib/sample-data.mjs    placeholder fights used when there are no credentials
+src/lib/data.ts            holds the current snapshot; derives fighters, records and helpers
 src/config.ts              site title and tagline
 src/styles/global.css      colours, type and shared styles
 src/components/            FightCard, Gloves, BarList, Columns
 src/pages/                 index, fights/[slug], fighters/, stats, 404
+astro.config.mjs           on-demand rendering, Netlify adapter, env variables
 netlify.toml               Netlify build settings
 ```
 
 ## Troubleshooting
 
+- **An edit in Notion isn't showing** — reload again after 30 seconds. If it still isn't there, check the function log (Netlify → Logs → Functions) for a Notion error.
 - **`Notion API 404`** — wrong database ID, or the database is not shared with the integration (step 2 above).
 - **`Notion API 401`** — the token is wrong or was regenerated.
-- **A fight is missing from the site** — its Rating is empty. Fights without a rating are skipped; the build log says how many.
+- **A fight is missing from the site** — its Rating is empty. Fights without a rating are skipped; the function log says how many.
 - **A fight has no video** — the Link is empty or is not a YouTube URL. Some YouTube uploads also block embedding; the "Watch on YouTube" button still works.
 - **A fighter's record looks off** — records only count fights in this database, and need the Winner value to match a name in Fighters.

@@ -1,6 +1,6 @@
-// Placeholder rows used only when no Notion credentials are available locally,
+// Placeholder rows used only when no Notion credentials are set,
 // so the site can be previewed before the database is connected.
-// Same shape as a row read from Notion (see toRecord in fetch-notion.mjs).
+// Same shape as a row read from Notion (see toRecord in notion.mjs).
 
 export const sampleRecords = [
   {

@@ -1,18 +1,5 @@
-// Reads the Notion boxing database and writes src/data/fights.json.
-// Runs before `astro dev` and `astro build` (see package.json).
-//
-// Env: NOTION_TOKEN, NOTION_DATABASE_ID
-
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { sampleRecords } from './sample-data.mjs';
-
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/fights.json');
-const TOKEN = process.env.NOTION_TOKEN?.trim();
-const DATABASE_ID = parseId(process.env.NOTION_DATABASE_ID);
-const IS_CI = Boolean(process.env.NETLIFY || process.env.CI);
+// Reads the Notion boxing database and turns its rows into plain fight records.
+// Called at request time by src/lib/data.ts.
 
 const API = 'https://api.notion.com/v1';
 const CURRENT = '2025-09-03'; // databases contain one or more data sources
@@ -36,12 +23,12 @@ class NotionError extends Error {
   }
 }
 
-async function notion(path, { method = 'GET', body, version = CURRENT } = {}) {
+async function notion(token, path, { method = 'GET', body, version = CURRENT } = {}) {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${API}${path}`, {
       method,
       headers: {
-        Authorization: `Bearer ${TOKEN}`,
+        Authorization: `Bearer ${token}`,
         'Notion-Version': version,
         'Content-Type': 'application/json',
       },
@@ -58,11 +45,11 @@ async function notion(path, { method = 'GET', body, version = CURRENT } = {}) {
   }
 }
 
-async function queryAll(path, version) {
+async function queryAll(token, path, version) {
   const pages = [];
   let cursor;
   do {
-    const res = await notion(path, {
+    const res = await notion(token, path, {
       method: 'POST',
       version,
       body: { page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) },
@@ -73,23 +60,23 @@ async function queryAll(path, version) {
   return pages;
 }
 
-async function fetchPages() {
+async function fetchPages(token, databaseId) {
   let database;
   try {
-    database = await notion(`/databases/${DATABASE_ID}`);
+    database = await notion(token, `/databases/${databaseId}`);
   } catch (err) {
     if (err.status !== 404) throw err;
     // The ID may already be a data source ID rather than a database ID.
     try {
-      return await queryAll(`/data_sources/${DATABASE_ID}/query`, CURRENT);
+      return await queryAll(token, `/data_sources/${databaseId}/query`, CURRENT);
     } catch {
       throw err;
     }
   }
   const sources = database.data_sources ?? [];
-  if (sources.length === 0) return queryAll(`/databases/${DATABASE_ID}/query`, LEGACY);
+  if (sources.length === 0) return queryAll(token, `/databases/${databaseId}/query`, LEGACY);
   const pages = [];
-  for (const source of sources) pages.push(...(await queryAll(`/data_sources/${source.id}/query`, CURRENT)));
+  for (const source of sources) pages.push(...(await queryAll(token, `/data_sources/${source.id}/query`, CURRENT)));
   return pages;
 }
 
@@ -260,46 +247,14 @@ export function normalise(records) {
 
 /* ---------- Main ---------- */
 
-async function write(source, fights) {
-  await mkdir(dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify({ source, generatedAt: new Date().toISOString(), fights }, null, 2) + '\n');
-}
-
-function fail(message) {
-  console.error(`\n[notion] ${message}\n`);
-  process.exit(1);
-}
-
-async function main() {
-  if (!TOKEN || !DATABASE_ID) {
-    const missing = [!TOKEN && 'NOTION_TOKEN', !DATABASE_ID && 'NOTION_DATABASE_ID'].filter(Boolean).join(' and ');
-    if (IS_CI) fail(`${missing} not set. Add it under Site configuration → Environment variables in Netlify.`);
-    // Keep a previous real fetch; sample data is always regenerated.
-    if (existsSync(OUT) && JSON.parse(await readFile(OUT, 'utf8')).source === 'notion') {
-      console.warn(`[notion] ${missing} not set — keeping existing src/data/fights.json.`);
-      return;
-    }
-    const sample = normalise(sampleRecords);
-    await write('sample', sample);
-    console.warn(`[notion] ${missing} not set — wrote ${sample.length} SAMPLE fights. Add a .env file to load your database (see README).`);
-    return;
-  }
-
+export async function fetchFights(token, databaseId) {
   let pages;
   try {
-    pages = await fetchPages();
+    pages = await fetchPages(token.trim(), parseId(databaseId));
   } catch (err) {
-    const hint =
-      err.status === 404
-        ? '\n         Check NOTION_DATABASE_ID, and that the database is shared with your integration (••• → Connections).'
-        : err.status === 401
-          ? '\n         Check NOTION_TOKEN.'
-          : '';
-    if (!IS_CI && existsSync(OUT)) {
-      console.warn(`[notion] ${err.message}${hint}\n[notion] Using the previously fetched src/data/fights.json.`);
-      return;
-    }
-    fail(`${err.message}${hint}`);
+    if (err.status === 404) err.message += '\n         Check NOTION_DATABASE_ID, and that the database is shared with your integration (••• → Connections).';
+    if (err.status === 401) err.message += '\n         Check NOTION_TOKEN.';
+    throw err;
   }
 
   if (pages[0]) {
@@ -311,8 +266,6 @@ async function main() {
   const records = pages.filter((p) => p.object === 'page' && !p.archived && !p.in_trash).map(toRecord);
   const fights = normalise(records);
   const hidden = records.filter((r) => !hasRating(r)).length;
-  await write('notion', fights);
-  console.log(`[notion] Wrote ${fights.length} fights to src/data/fights.json${hidden ? ` (${hidden} with an empty Rating hidden)` : ''}`);
+  console.log(`[notion] Loaded ${fights.length} fights${hidden ? ` (${hidden} with an empty Rating hidden)` : ''}`);
+  return fights;
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

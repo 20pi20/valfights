@@ -7,12 +7,12 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "fetch": "node --env-file-if-exists=.env scripts/fetch-notion.mjs",
-    "dev": "npm run fetch && astro dev",
-    "build": "npm run fetch && astro build",
+    "dev": "astro dev",
+    "build": "astro build",
     "preview": "astro preview"
   },
   "dependencies": {
+    "@astrojs/netlify": "^8.2.9",
     "@fontsource/anton": "^5.2.7",
     "@fontsource/barlow": "^5.2.8",
     "@fontsource/barlow-condensed": "^5.2.8",

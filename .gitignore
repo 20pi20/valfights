@@ -6,6 +6,3 @@ dist/
 .env.*
 !.env.example
 .DS_Store
-
-# Generated at build time by scripts/fetch-notion.mjs
-src/data/fights.json

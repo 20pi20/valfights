@@ -1,4 +1,6 @@
-import raw from '../data/fights.json';
+import { NOTION_DATABASE_ID, NOTION_TOKEN } from 'astro:env/server';
+import { fetchFights, normalise } from './notion.mjs';
+import { sampleRecords } from './sample-data.mjs';
 
 export interface Fight {
   id: string;
@@ -35,13 +37,44 @@ export interface Fighter {
   weightClasses: string[];
 }
 
-export const source = raw.source as 'notion' | 'sample';
-export const generatedAt = raw.generatedAt as string;
-
+// Live snapshot of the database, replaced by refresh(). Importers always see the latest copy.
+export let source: 'notion' | 'sample' = 'sample';
+export let generatedAt = '';
 // Newest fight first; undated fights last.
-export const fights: Fight[] = [...(raw.fights as Fight[])].sort((a, b) =>
-  (b.fightDate ?? '').localeCompare(a.fightDate ?? ''),
-);
+export let fights: Fight[] = [];
+export let fighters: Fighter[] = [];
+let fighterSlugs = new Map<string, string>();
+
+// Notion is re-read on a page load once the snapshot is older than this.
+const MAX_AGE_MS = 30_000;
+let loadedAt = 0;
+let pending: Promise<void> | null = null;
+
+/** Called by src/middleware.ts before every page render. */
+export function refresh(): Promise<void> | void {
+  if (loadedAt && Date.now() - loadedAt < MAX_AGE_MS) return;
+  return (pending ??= load().finally(() => (pending = null)));
+}
+
+async function load() {
+  const live = Boolean(NOTION_TOKEN && NOTION_DATABASE_ID);
+  let rows: Fight[];
+  try {
+    rows = (live ? await fetchFights(NOTION_TOKEN!, NOTION_DATABASE_ID!) : normalise(sampleRecords)) as Fight[];
+  } catch (err) {
+    // Notion is down or rate-limiting: keep serving the last good snapshot if there is one.
+    if (!loadedAt) throw err;
+    console.warn(`[notion] ${(err as Error).message}\n[notion] Serving the previously loaded fights.`);
+    loadedAt = Date.now();
+    return;
+  }
+  fights = rows.sort((a, b) => (b.fightDate ?? '').localeCompare(a.fightDate ?? ''));
+  fighters = buildFighters(fights);
+  fighterSlugs = new Map(fighters.map((f) => [f.name, f.slug]));
+  source = live ? 'notion' : 'sample';
+  generatedAt = new Date().toISOString();
+  loadedAt = Date.now();
+}
 
 export function slugify(value: string): string {
   return value
@@ -95,7 +128,7 @@ export function countBy<T>(items: T[], keyOf: (item: T) => string | number | nul
   return [...counts].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
 }
 
-function buildFighters(): Fighter[] {
+function buildFighters(fights: Fight[]): Fighter[] {
   const byName = new Map<string, Fight[]>();
   for (const fight of fights) {
     for (const name of fight.fighters) byName.set(name, [...(byName.get(name) ?? []), fight]);
@@ -123,9 +156,6 @@ function buildFighters(): Fighter[] {
     .sort((a, b) => b.fights.length - a.fights.length || a.name.localeCompare(b.name));
 }
 
-export const fighters: Fighter[] = buildFighters();
-
-const fighterSlugs = new Map(fighters.map((f) => [f.name, f.slug]));
 export const fighterUrl = (name: string) => `/fighters/${fighterSlugs.get(name) ?? slugify(name)}/`;
 export const fightUrl = (fight: Fight) => `/fights/${fight.slug}/`;
 

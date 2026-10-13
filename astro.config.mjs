@@ -1,7 +1,17 @@
-import { defineConfig } from 'astro/config';
+import { defineConfig, envField } from 'astro/config';
+import netlify from '@astrojs/netlify';
 
-// Fully static build: Notion is read once by scripts/fetch-notion.mjs before `astro build`.
+// Pages are rendered on request so they always reflect the Notion database (see src/lib/data.ts).
 export default defineConfig({
-  output: 'static',
+  output: 'server',
+  adapter: netlify(),
   trailingSlash: 'ignore',
+  // Not used here; the adapter would otherwise set up Netlify Blobs session storage.
+  session: false,
+  env: {
+    schema: {
+      NOTION_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
+      NOTION_DATABASE_ID: envField.string({ context: 'server', access: 'secret', optional: true }),
+    },
+  },
 });
